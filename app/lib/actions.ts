@@ -936,7 +936,6 @@ export async function resolveTicket(ticketId: string) {
         program: true,
       },
     });
-    await syncTicketReaction(ticket.program.channelId, ticket.messageId, 2);
   } catch (e) {
     console.error("Problem assigning a resolver: ", e);
     console.error("Resolver: ", session.user.slackId);
@@ -1050,11 +1049,6 @@ export async function reopenTicket(ticketId: string) {
         assignees: true,
       },
     });
-    await syncTicketReaction(
-      ticket.program.channelId,
-      ticket.messageId,
-      ticket.assignees.length > 0 ? 1 : 0,
-    );
   } catch (e) {
     console.error("Problem reopening: ", e);
     console.error("Occurred on ticket ", ticket.id);
