@@ -1134,3 +1134,27 @@ export async function deleteProgram(programId: string) {
   revalidatePath("/dashboard");
   redirect("/dashboard");
 }
+export async function deleteTicket(ticketId: string) {
+  await throwIfNoAuth();
+  const admin = await isAdmin();
+  if (!admin) throw new Error("Unauthorized");
+
+  await prisma.iNote.deleteMany({
+    where: {
+      ticketId: ticketId,
+    },
+  });
+
+  await prisma.reply.deleteMany({
+    where: {
+      ticketId: ticketId,
+    },
+  });
+
+  const ticket = await prisma.ticket.delete({
+    where: {
+      id: ticketId,
+    },
+  });
+  redirect(`/programs/${ticket.programId}`);
+}

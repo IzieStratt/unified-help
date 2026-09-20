@@ -27,6 +27,7 @@ import {
   SendIcon,
   SquareArrowOutUpRightIcon,
   TagIcon,
+  TrashIcon,
   TriangleAlertIcon,
   XIcon,
 } from "lucide-react";
@@ -50,6 +51,7 @@ import {
   resolveTicket,
   reopenTicket,
   resolveTicketWithMacro,
+  deleteTicket,
 } from "../lib/actions";
 import { useEffect, useState } from "react";
 import { SlackUser } from "@/generated/prisma/browser";
@@ -141,7 +143,7 @@ export default function TicketUI({
       if (!ticket) return;
       setSending(true);
       await replyToTicket(ticket.id, ticket.programId, message, ctx);
-      toast("Posted!", {
+      toast("This message has been posted. It may take some time to update.", {
         indicator: <CheckIcon />,
       });
       setMessage("");
@@ -189,12 +191,16 @@ export default function TicketUI({
     });
   }
 
+  async function handleTicketDelete() {
+    if (ticket) deleteTicket(ticket.id);
+  }
+
   async function handleResolve() {
     try {
       if (!ticket) return;
       setResolving(true);
       await resolveTicket(ticket.id);
-      toast("Resolved!", {
+      toast("This ticket has been resolved. It may take some time to update.", {
         indicator: <CheckIcon />,
       });
       mutate();
@@ -341,7 +347,7 @@ export default function TicketUI({
       if (!ticket) return;
       setSendingINote(true);
       await postINote(ticket.id, ticket.programId, inote);
-      toast("This ticket was posted. It may take some time to update.", {
+      toast("This internal note has been posted.", {
         indicator: <CheckIcon />,
       });
       setMessage("");
@@ -558,21 +564,26 @@ export default function TicketUI({
               </div>
               <div className="flex gap-2 items-center">
                 {isAdmin && (
-                  <Button
-                    onClick={handleReindex}
-                    isPending={reindexing}
-                    variant="secondary"
-                  >
-                    {reindexing ? (
-                      <>
-                        <Spinner color="current" />
-                      </>
-                    ) : (
-                      <>
-                        <RefreshCwIcon />
-                      </>
-                    )}
-                  </Button>
+                  <>
+                    <Button onClick={handleTicketDelete} variant="secondary">
+                      <TrashIcon />
+                    </Button>
+                    <Button
+                      onClick={handleReindex}
+                      isPending={reindexing}
+                      variant="secondary"
+                    >
+                      {reindexing ? (
+                        <>
+                          <Spinner color="current" />
+                        </>
+                      ) : (
+                        <>
+                          <RefreshCwIcon />
+                        </>
+                      )}
+                    </Button>
+                  </>
                 )}
                 <Link
                   href={`https://hackclub.slack.com/archives/${ticket.program.channelId}/p${Number(ticket.messageId) * 1000000}`}
