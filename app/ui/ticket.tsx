@@ -227,7 +227,7 @@ export default function TicketUI({
       if (!ticket) return;
       setResolving(true);
       await reopenTicket(ticket.id);
-      toast("Reopened!", {
+      toast("Reopened the ticket. It may take some time to update.", {
         indicator: <CheckIcon />,
       });
       mutate();
@@ -255,12 +255,17 @@ export default function TicketUI({
     }
   }
 
-  async function handleMacro(macroKey: string) {
+  async function handleMacro(macroId: number) {
     try {
       if (!ticket) return;
       setResolving(true);
-      await resolveTicketWithMacro(ticket.id, macroKey);
-      toast("Resolved!", {
+      await resolveTicketWithMacro(
+        ticket.id,
+        macroId,
+        ticket.messageId,
+        ticket.programId,
+      );
+      toast("Marked as resolved. It may take some time to update.", {
         indicator: <CheckIcon />,
       });
       mutate();
@@ -336,7 +341,7 @@ export default function TicketUI({
       if (!ticket) return;
       setSendingINote(true);
       await postINote(ticket.id, ticket.programId, inote);
-      toast("Posted!", {
+      toast("This ticket was posted. It may take some time to update.", {
         indicator: <CheckIcon />,
       });
       setMessage("");
@@ -772,10 +777,10 @@ export default function TicketUI({
                                           (m) =>
                                             m.action === "resolve" &&
                                             m.macro !== "?resolve",
-                                        ).map((m) => (
+                                        ).map((m, i) => (
                                           <Dropdown.Item
                                             key={m.macro}
-                                            onClick={() => handleMacro(m.macro)}
+                                            onClick={() => handleMacro(i)}
                                           >
                                             {m.label}
                                           </Dropdown.Item>

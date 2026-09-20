@@ -308,66 +308,6 @@ export async function postMacroMessage(
   });
 }
 
-export async function resolveMessage(
-  channelId: string,
-  messageTs: string,
-  username: string,
-  iconUrl: string,
-  resolverId: string,
-  resolveMessage: string,
-  ticketId: string,
-  programId: string,
-) {
-  await web.chat.postMessage({
-    channel: channelId,
-    thread_ts: messageTs,
-    username: username,
-    icon_url: iconUrl,
-    text: `<@${resolverId}> marked this as resolved.`,
-    blocks: [
-      {
-        type: "section",
-        text: {
-          type: "mrkdwn",
-          text: resolveMessage.replace("{USERNAME}", `<@${resolverId}>`),
-        },
-      },
-      {
-        type: "section",
-        text: {
-          type: "mrkdwn",
-          text: `<@${resolverId}> marked this as resolved. If this issue is still unresolved, click the *Reopen* button.`,
-        },
-      },
-      {
-        type: "actions",
-        elements: [
-          {
-            type: "button",
-            text: {
-              type: "plain_text",
-              text: "Reopen",
-              emoji: true,
-            },
-            value: ticketId,
-            action_id: "reopen",
-            style: "primary",
-          },
-        ],
-      },
-      {
-        type: "context",
-        elements: [
-          {
-            type: "mrkdwn",
-            text: `<https://unified.help.hackclub.com/programs/${programId}/ticket/${ticketId}|Open with Unified Help>`,
-          },
-        ],
-      },
-    ],
-    unfurl_links: false,
-  });
-}
 export async function reopenMessage(
   channelId: string,
   messageTs: string,

@@ -33,6 +33,13 @@ export const MANAGED_PROGRAM_MACROS: ManagedProgramMacro[] = [
     action: "resolve",
   },
   {
+    macro: "?stale",
+    label: "Stale",
+    message:
+      "Hey, {USERNAME}! It seems like this ticket has been inactive for some days so I'll be closing it.\nIf your question wasn't answered, please feel free to make a new one. Thanks!",
+    action: "resolve",
+  },
+  {
     macro: "?resolve",
     label: "Resolve",
     message: "",
@@ -44,20 +51,17 @@ export const MANAGED_PROGRAM_MACROS: ManagedProgramMacro[] = [
     message: "",
     action: "reopen",
   },
-  {
-    macro: "?stale",
-    label: "Stale",
-    message:
-      "Hey, {USERNAME}! It seems like this ticket has been inactive for some days so I'll be closing it.\nIf your question wasn't answered, please feel free to make a new one. Thanks!",
-    action: "resolve",
-  },
 ];
 
-export function getManagedProgramMacro(text: string): ManagedProgramMacro | undefined {
+export function getManagedProgramMacro(
+  text: string,
+): ManagedProgramMacro | undefined {
   const trimmed = text.trim();
   return MANAGED_PROGRAM_MACROS.find((m) => {
     const rest = trimmed.slice(m.macro.length);
-    return trimmed.startsWith(m.macro) && (rest.length === 0 || /^\s/.test(rest));
+    return (
+      trimmed.startsWith(m.macro) && (rest.length === 0 || /^\s/.test(rest))
+    );
   });
 }
 
@@ -79,7 +83,8 @@ export const RESOLVE_MACROS = [
     friendlyMessage: "Redirected to Shipwrights",
   },
   {
-    keyword: "It seems like this ticket has been inactive for some days so I'll be closing it",
-    friendlyMessage: "Resolved as stale"
-  }
+    keyword:
+      "It seems like this ticket has been inactive for some days so I'll be closing it",
+    friendlyMessage: "Resolved as stale",
+  },
 ];

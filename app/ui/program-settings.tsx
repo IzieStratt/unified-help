@@ -235,9 +235,13 @@ export default function ProgramSettings({
     if (
       trimmed &&
       trimmed.toLowerCase() !== (program.helperChannelId ?? "").toLowerCase() &&
-      existingChannelIds.some((id) => id.toLowerCase() === trimmed.toLowerCase())
+      existingChannelIds.some(
+        (id) => id.toLowerCase() === trimmed.toLowerCase(),
+      )
     ) {
-      setHelperChannelError("This channel ID is already used by another program");
+      setHelperChannelError(
+        "This channel ID is already used by another program",
+      );
       return;
     }
     setHelperChannelError(undefined);
@@ -547,7 +551,7 @@ export default function ProgramSettings({
           <SaveIcon /> Save changes
         </Button>
       </div>
-      {!program.managed && (
+      {(!program.managed || (program.managed && isAdmin)) && (
         <div className="flex flex-col gap-1">
           <Label htmlFor="programName">Backlog</Label>
           <p className="text-muted">

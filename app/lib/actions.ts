@@ -11,7 +11,6 @@ import {
   postMessageAsResolver,
   reopenMessage,
   replyAsUser,
-  resolveMessage,
   syncTicketReaction,
 } from "./slack";
 import { getManagedProgramMacro } from "./constants";
@@ -142,7 +141,7 @@ export async function startBacklog(
         programId: programId,
         backlogTo: backlogTo,
         backlogFrom: backlogFrom,
-        actorId: session.user.id,
+        actorId: session.user.slackUserId,
       }),
       headers: {
         "Content-type": "application/json",
@@ -219,10 +218,11 @@ export async function removeHelper(slackId: string, programId: string) {
       id: programId,
     },
     include: {
-      poc: true
-    }
-  })
-  if (slackId === program?.poc?.slackUserId) throw new Error("You cannot remove the PoC from this managed program")
+      poc: true,
+    },
+  });
+  if (slackId === program?.poc?.slackUserId)
+    throw new Error("You cannot remove the PoC from this managed program");
   await prisma.slackUser.update({
     where: {
       id: slackId,
@@ -519,10 +519,11 @@ export async function demoteHelper(userId: string, programId: string) {
       id: programId,
     },
     include: {
-      poc: true
-    }
-  })
-  if (userId === program?.poc?.id) throw new Error("You cannot demote the PoC from this managed program")
+      poc: true,
+    },
+  });
+  if (userId === program?.poc?.id)
+    throw new Error("You cannot demote the PoC from this managed program");
 
   await prisma.program.update({
     where: {
@@ -903,6 +904,25 @@ export async function resolveTicket(ticketId: string) {
     throw new Error("PARENT_MESSAGE_DELETED");
   }
 
+  if (ticket.program.managed) {
+    await fetch(
+      `${process.env["SCRAPER_API_URL"]}/api/ticket/${ticket.id}/resolve-managed`,
+      {
+        method: "POST",
+        body: JSON.stringify({
+          ticketId: ticketId,
+          messageTs: ticket.messageId,
+          resolveTime: (Date.now() - Number(ticket.messageId) * 1000) / 1000,
+          resolveDate: new Date(),
+          actorId: session.user.slackUserId,
+        }),
+        headers: {
+          "Content-type": "application/json",
+          "x-api-key": process.env["SCRAPER_API_KEY"]!,
+        },
+      },
+    );
+  }
   try {
     await prisma.ticket.update({
       where: {
@@ -911,132 +931,55 @@ export async function resolveTicket(ticketId: string) {
       data: {
         resolverId: session.user.slackId,
         status: 2,
-        resolveTime: (Date.now() - Number(ticket.messageId) * 1000) / 1000,
-        resolveDate: new Date(),
       },
       include: {
         program: true,
       },
     });
-    await syncTicketReaction(
-      ticket.program.channelId,
-      ticket.messageId,
-      2,
-    );
+    await syncTicketReaction(ticket.program.channelId, ticket.messageId, 2);
   } catch (e) {
     console.error("Problem assigning a resolver: ", e);
     console.error("Resolver: ", session.user.slackId);
     console.error("Occurred on ticket ", ticket.id);
     throw e;
   }
-  if (ticket.program.managed) {
-    await resolveMessage(
-      ticket.program.channelId,
-      ticket.messageId,
-      ticket.program.supportBotName,
-      ticket.program.logo ?? "",
-      session.user.slackId,
-      ticket.program.resolveMessage,
-      ticket.id,
-      ticket.program.id,
-    );
-    indexThread(ticket.id, ticket.programId);
-  } else {
-    await postMessageAsResolver(
-      ticket.messageId,
-      ticket.program.channelId,
-      "?resolve",
-      `Marked as resolved by <@${session.user.slackId}>.`,
-    );
-  }
+
+  await postMessageAsResolver(
+    ticket.messageId,
+    ticket.program.channelId,
+    "?resolve",
+    `Marked as resolved by <@${session.user.slackId}>.`,
+  );
 
   revalidatePath(`/programs/${ticket.programId}/ticket/${ticketId}`);
 }
 
 export async function resolveTicketWithMacro(
   ticketId: string,
-  macroKey: string,
+  macroId: number,
+  messageId: string,
+  programId: string,
 ) {
   await throwIfNoAuth();
 
-  const macro = getManagedProgramMacro(macroKey);
-  if (!macro) throw new Error("Invalid macro");
-
-  const ticket = await prisma.ticket.findUnique({
-    where: { id: ticketId },
-    include: { program: true, slackUser: true },
-  });
-
-  if (!ticket) return;
-  if (!ticket.program.managed)
-    throw new Error("Macros are only available for managed programs");
-  if (!ticket.program.allowResolver)
-    throw new Error("Program does not allow resolving through Unified Help");
-
-  const helper = await isHelper(ticket.programId);
-  if (!helper) throw new Error("unauthorized");
-
-  const session = await auth.api.getSession({
-    headers: await headers(),
-  });
-  if (!session || !session.user || !session.user.slackId) {
-    throw new Error("unauthenticated");
-  }
-
-  if (
-    await isParentMessageDeleted(ticket.messageId, ticket.program.channelId)
-  ) {
-    throw new Error("PARENT_MESSAGE_DELETED");
-  }
-
-  if (macro.macro === "?resolve") {
-    return resolveTicket(ticketId);
-  }
-  if (macro.macro === "?reopen") {
-    return reopenTicket(ticketId);
-  }
-
-  if (ticket.status === 2) {
-    throw new Error("Ticket is already resolved");
-  }
-
-  const expandedMessage = macro.message.replace(
-    "{USERNAME}",
-    ticket.slackUser.username,
-  );
-
-  try {
-    await prisma.ticket.update({
-      where: { id: ticket.id },
-      data: {
-        status: 2,
-        resolveTime: (Date.now() - Number(ticket.messageId) * 1000) / 1000,
+  await fetch(
+    `${process.env["SCRAPER_API_URL"]}/api/ticket/${ticketId}/resolve-with-macro`,
+    {
+      method: "POST",
+      body: JSON.stringify({
+        ticketId: ticketId,
+        resolveTime: (Date.now() - Number(messageId) * 1000) / 1000,
         resolveDate: new Date(),
+        macroId: macroId,
+        threadTs: messageId,
+      }),
+      headers: {
+        "Content-type": "application/json",
+        "x-api-key": process.env["SCRAPER_API_KEY"]!,
       },
-    });
-    await syncTicketReaction(
-      ticket.program.channelId,
-      ticket.messageId,
-      2,
-    );
-  } catch (e) {
-    console.error("Problem resolving ticket with macro: ", e);
-    console.error("Occurred on ticket ", ticket.id);
-    throw e;
-  }
-
-  await postMacroMessage(
-    ticket.program.channelId,
-    ticket.messageId,
-    ticket.program.supportBotName,
-    ticket.program.logo ?? "",
-    expandedMessage,
-    ticket.id,
-    ticket.program.id,
+    },
   );
-
-  indexThread(ticket.id, ticket.programId);
-  revalidatePath(`/programs/${ticket.programId}/ticket/${ticketId}`);
+  revalidatePath(`/programs/${programId}/ticket/${ticketId}`);
 }
 
 export async function reopenTicket(ticketId: string) {
@@ -1072,6 +1015,24 @@ export async function reopenTicket(ticketId: string) {
     throw new Error("PARENT_MESSAGE_DELETED");
   }
 
+  if (ticket.program.managed) {
+    await fetch(
+      `${process.env["SCRAPER_API_URL"]}/api/ticket/${ticketId}/reopen-managed`,
+      {
+        method: "POST",
+        body: JSON.stringify({
+          ticketId: ticketId,
+          actor: session.user.slackUserId,
+          threadTs: ticket.messageId,
+        }),
+        headers: {
+          "Content-type": "application/json",
+          "x-api-key": process.env["SCRAPER_API_KEY"]!,
+        },
+      },
+    );
+    return;
+  }
   try {
     await prisma.ticket.update({
       where: {
@@ -1099,26 +1060,13 @@ export async function reopenTicket(ticketId: string) {
     console.error("Occurred on ticket ", ticket.id);
     throw e;
   }
-  if (ticket.program.managed) {
-    await reopenMessage(
-      ticket.program.channelId,
-      ticket.messageId,
-      ticket.program.supportBotName,
-      ticket.program.logo ?? "",
-      session.user.slackId,
-      ticket.program.resolveMessage,
-      ticket.id,
-      ticket.program.id,
-    );
-    indexThread(ticket.id, ticket.programId);
-  } else {
-    await postMessageAsResolver(
-      ticket.messageId,
-      ticket.program.channelId,
-      "?reopen",
-      `This ticket was reopened by <@${session.user.slackId}>.`,
-    );
-  }
+
+  await postMessageAsResolver(
+    ticket.messageId,
+    ticket.program.channelId,
+    "?reopen",
+    `This ticket was reopened by <@${session.user.slackId}>.`,
+  );
 
   revalidatePath(`/programs/${ticket.programId}/ticket/${ticketId}`);
 }
