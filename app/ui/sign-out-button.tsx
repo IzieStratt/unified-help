@@ -1,9 +1,11 @@
 "use client";
 
-import { LogOutIcon } from "lucide-react";
+import { BellIcon, LogOutIcon } from "lucide-react";
 import { Avatar, Dropdown, Label } from "@heroui/react";
 import { authClient } from "../lib/auth-client";
 import { useRouter } from "next/navigation";
+import { useNotificationPermission } from "../lib/use-notification-permission";
+
 export default function SignOutButton({
   username,
   pfp,
@@ -14,6 +16,10 @@ export default function SignOutButton({
   userId: string;
 }) {
   const router = useRouter();
+  const { permission, requestPermission } = useNotificationPermission();
+  const showEnableNotifications =
+    permission !== "granted" && permission !== "unsupported";
+
   return (
     <Dropdown>
       <Dropdown.Trigger>
@@ -41,6 +47,13 @@ export default function SignOutButton({
               {username}
             </Label>
           </Dropdown.Item>
+
+          {showEnableNotifications && (
+            <Dropdown.Item id="enableNotifications" onClick={requestPermission}>
+              <BellIcon width={16} />
+              <Label>Enable notifications</Label>
+            </Dropdown.Item>
+          )}
 
           <Dropdown.Item id="signOut">
             <LogOutIcon width={16} />

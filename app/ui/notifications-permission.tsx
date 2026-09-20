@@ -1,57 +1,62 @@
 "use client";
 
 import { Button } from "@heroui/react";
+import { XIcon } from "lucide-react";
 import { useSyncExternalStore } from "react";
+import { useNotificationPermission } from "../lib/use-notification-permission";
 
-// This part was written by Claude because it had to
-// bugfix something about "window is not defined".
-type Permission = NotificationPermission | "unsupported";
+const DISMISS_KEY = "notifications-banner-dismissed";
 
-const listeners = new Set<() => void>();
+type Dismissed = boolean | null;
 
-function subscribe(onStoreChange: () => void) {
-  listeners.add(onStoreChange);
+const dismissedListeners = new Set<() => void>();
+
+function subscribeDismissed(onStoreChange: () => void) {
+  dismissedListeners.add(onStoreChange);
   return () => {
-    listeners.delete(onStoreChange);
+    dismissedListeners.delete(onStoreChange);
   };
 }
 
-function getSnapshot(): Permission {
-  return "Notification" in window ? Notification.permission : "unsupported";
+function getDismissedSnapshot(): Dismissed {
+  if (typeof window === "undefined") return null;
+  return window.localStorage.getItem(DISMISS_KEY) === "true";
 }
 
-function getServerSnapshot(): Permission {
-  return "unsupported";
+function getDismissedServerSnapshot(): Dismissed {
+  return null;
+}
+
+function setDismissed(dismissed: boolean) {
+  if (typeof window === "undefined") return;
+  window.localStorage.setItem(DISMISS_KEY, String(dismissed));
+  dismissedListeners.forEach((listener) => listener());
 }
 
 export default function NotificationsPermission() {
-  const permission = useSyncExternalStore(
-    subscribe,
-    getSnapshot,
-    getServerSnapshot,
+  const { permission, requestPermission } = useNotificationPermission();
+  const dismissed = useSyncExternalStore(
+    subscribeDismissed,
+    getDismissedSnapshot,
+    getDismissedServerSnapshot,
   );
 
-  if (permission !== "default") return null; // End of Claude Code
-
-  function requestPerms() {
-    Notification.requestPermission().then((result) => {
-      listeners.forEach((listener) => listener());
-      if (result === "granted") {
-        new Notification("You've enabled notifications!");
-      }
-    });
-  }
+  if (permission !== "default") return null;
+  if (dismissed) return null;
 
   return (
-    <div className="w-full bg-yellow-500 text-black p-2 text-center">
+    <div className="w-full bg-yellow-500 text-black p-2 text-center flex flex-row justify-center items-center gap-4">
       <p>
         <b>Enable notifications </b> to get notified when new tickets arrive.
         (Keep your program&apos;s tab open to receive notifications for
         tickets!){" "}
-        <Button onClick={requestPerms} size="sm">
-          Enable now
-        </Button>
       </p>
+      <Button onClick={requestPermission} size="sm">
+        Enable now
+      </Button>
+      <Button onClick={() => setDismissed(true)} size="sm" isIconOnly>
+        <XIcon width={8} />
+      </Button>
     </div>
   );
 }
